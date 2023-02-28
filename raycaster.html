@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Raycaster</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        height: 100%;
+      }
+
+      body {
+        background: #000;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        place-items: center;
+      }
+
+      canvas {
+        image-rendering: pixelated;
+
+        aspect-ratio: 16 / 9;
+
+        width: auto;
+        height: 100%;
+      }
+
+      @media (max-aspect-ratio: 16 / 9)
+      {
+        canvas {
+          width: 100%;
+          height: auto;
+        }
+      }
+      </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <script>
+      async function main()
+      {
+        const { module, instance } = await WebAssembly.instantiateStreaming(fetch('./raycaster.wasm'), {
+          env: {
+            abs: Math.abs,
+            cos: Math.cos,
+            sin: Math.sin,
+            hypot: Math.hypot
+          }
+        })
+        console.log(module, instance)
+
+        const keys = new Map()
+
+        const Level = {
+          WIDTH: 8,
+          HEIGHT: 8
+        }
+
+        const Screen = {
+          WIDTH: 320,
+          HEIGHT: 180
+        }
+
+        const canvas = document.querySelector('canvas')
+        canvas.width = Screen.WIDTH
+        canvas.height = Screen.HEIGHT
+
+        const cx = canvas.getContext('2d')
+
+        const level = new Uint32Array(
+          instance.exports.memory.buffer,
+          instance.exports.level.value,
+          Level.WIDTH * Level.HEIGHT
+        )
+        level.set([
+          1, 1, 1, 1, 1, 1, 1, 1,
+          1, 0, 1, 0, 0, 1, 0, 1,
+          1, 0, 1, 1, 0, 1, 0, 1,
+          1, 0, 0, 0, 0, 0, 0, 1,
+          1, 0, 0, 1, 1, 1, 0, 1,
+          1, 0, 1, 1, 0, 0, 0, 1,
+          1, 0, 0, 1, 0, 1, 0, 1,
+          1, 1, 1, 1, 1, 1, 1, 1,
+        ], 0)
+
+        const screen = new ImageData(
+          new Uint8ClampedArray(
+            instance.exports.memory.buffer,
+            instance.exports.screen.value,
+            Screen.WIDTH * Screen.HEIGHT * 4
+          ),
+          Screen.WIDTH,
+          Screen.HEIGHT
+        )
+
+        let frameId
+        function onFrame(time) {
+          if (keys.get('KeyW') || keys.get('ArrowUp')) {
+            instance.exports.move_forward(0.01)
+          } else if (keys.get('KeyS') || keys.get('ArrowDown')) {
+            instance.exports.move_backward(0.01)
+          }
+
+          if (keys.get('KeyA')) {
+            instance.exports.strafe_left(0.01)
+          } else if (keys.get('KeyD')) {
+            instance.exports.strafe_right(0.01)
+          }
+
+          if (keys.get('KeyQ') || keys.get('ArrowLeft')) {
+            instance.exports.turn_left(256)
+          } else if (keys.get('KeyE') || keys.get('ArrowRight')) {
+            instance.exports.turn_right(256)
+          }
+
+          instance.exports.update()
+
+          cx.putImageData(screen, 0, 0)
+
+          frameId = requestAnimationFrame(onFrame)
+        }
+
+        function onKey(e) {
+          keys.set(e.code, e.type === 'keydown')
+        }
+
+        function start() {
+          window.addEventListener('keyup', onKey)
+          window.addEventListener('keydown', onKey)
+
+          instance.exports.sprite_set_tile(0, 3, 1);
+          instance.exports.sprite_set_tile(1, 4, 2);
+          instance.exports.sprite_set_tile(2, 1, 5);
+
+          instance.exports.setup()
+
+          frameId = requestAnimationFrame(onFrame)
+        }
+
+        start()
+      }
+
+      main()
+    </script>
+  </body>
+</html>

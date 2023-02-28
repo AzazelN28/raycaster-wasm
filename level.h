@@ -1,0 +1,5 @@
+#pragma once
+
+#define LEVEL_WIDTH 256
+#define LEVEL_HEIGHT 256
+#define LEVEL_SIZE (LEVEL_WIDTH * LEVEL_HEIGHT)
